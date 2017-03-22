@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <iomanip>
+#include <stdexcept>
 
 using namespace std;
 
@@ -63,14 +64,14 @@ class Line;
 class Ray;
 class Polygon;
 
-class obj{
+class Shape{
 public:
     virtual void move(const Vector &) = 0;
     virtual bool contains(const Point &) const = 0;
     virtual bool intersects(const Segment &) const = 0;
 };
 
-class Point: public obj{
+class Point: public Shape{
 private:
     double x;
     double y;
@@ -95,6 +96,9 @@ public:
     double distance(const Point& p) const{
         return sqrt((p.x - this->x) * (p.x - this->x) + (p.y - this->y) * (p.y - this->y));
     }
+    bool operator==(const Point p) const {
+        return abs(this->x - p.x) < EPS && abs(this->y - p.y) < EPS;
+    }
     Point closestPoint(const Segment &s) const;
     friend ostream& operator<<(ostream& os, const Point& p){
         os << '(' << p.x << ", " << p.y << ')';
@@ -106,7 +110,7 @@ public:
     }
 };
 
-class Segment: public obj{
+class Segment: public Shape{
 private:
     Point start;
     Point end;
@@ -156,7 +160,7 @@ Vector::Vector(const Point& p1, const Point &p2){
     this->y = p2.getY() - p1.getY();
 }
 
-class Line: public obj{
+class Line: public Shape{
 private:
     double a;
     double b;
@@ -164,6 +168,9 @@ private:
 public:
     Line(double _a, double _b, double _c): a(_a), b(_b), c(_c){}
     Line(const Point& p1, const Point& p2){
+        if (p1 == p2){
+            throw std::runtime_error("Points must pe different!");
+        }
         this->a = p1.getY() - p2.getY();
         this->b = p2.getX() - p1.getX();
         this->c = det(p1.getX(), p1.getY(), p2.getX(), p2.getY());
@@ -171,8 +178,7 @@ public:
     Line(const Point& p, const Vector& v): a(-v.getY()), b(v.getX()), c(v.getY() * p.getX() - v.getX() * p.getY()){};
     Line(const Line& l): a(l.a), b(l.b), c(l.c){}
     Vector getVector(){
-        Vector res(-this->b, this->a);
-        return res;
+        return Vector(-this->b, this->a);
     }
     double getA(){
         return this->a;
@@ -232,22 +238,22 @@ public:
 };
 
 double Segment::distanceToPoint(const Point &p) const{ //проверил на informatics, работает
-    Vector AP(this->start, p);
-    Vector BP(this->end, p);
-    Vector AB(this->start, this->end);
-    if (AP * AB < EPS || BP * AB > -EPS)
+    Vector ap(this->start, p);
+    Vector bp(this->end, p);
+    Vector ab(this->start, this->end);
+    if (ap * ab < EPS || bp * ab > -EPS)
         return min(p.distance(this->start), p.distance(this->end));
     else
-        return (abs(AB.vectorproduct(AP))/ abs(AB.length()));
+        return (abs(ab.vectorproduct(ap))/ abs(ab.length()));
 }
 
 Point Point::closestPoint(const Segment &s) const{
-    Vector AP(s.getStart(), *this);
-    Vector BP(s.getEnd(), *this);
-    Vector AB(s.getStart(), s.getEnd());
-    if (AP * AB < 0)
+    Vector ap(s.getStart(), *this);
+    Vector bp(s.getEnd(), *this);
+    Vector ab(s.getStart(), s.getEnd());
+    if (ap * ab < 0)
         return s.getStart();
-    else if (BP * AB > 0)
+    else if (bp * ab > 0)
         return s.getEnd();
     else{
         double x, y;
@@ -270,7 +276,7 @@ Point Point::closestPoint(const Segment &s) const{
     }
 }
 
-class Ray: public obj{
+class Ray: public Shape{
 private:
     Point start;
     Vector a;
@@ -287,8 +293,8 @@ public:
         this->start.move(v);
     }
     bool contains(const Point &p) const{ //проверил на informatics, работает
-        Vector OP(this->start, p);
-        return abs(OP.vectorproduct(this->a)) < EPS && OP * this->a > -EPS;
+        Vector op(this->start, p);
+        return abs(op.vectorproduct(this->a)) < EPS && op * this->a > -EPS;
     }
     bool intersects(const Segment &s) const{
         Line rayLine(this->start, this->a);
@@ -301,12 +307,12 @@ public:
             return false;
     }
     double distanceToPoint(const Point &p) const{
-        Point B = this->getPoint();
-        Vector OP(this->start, p);
-        if (OP * this->a < EPS)
+        Point b = this->getPoint();
+        Vector op(this->start, p);
+        if (op * this->a < EPS)
             return p.distance(this->start);
         else
-            return abs(OP.vectorproduct(this->a) / OP.length());
+            return abs(op.vectorproduct(this->a) / op.length());
     }
 };
 
@@ -315,7 +321,7 @@ struct Vertex{
     Vertex* next;
 };
 
-class Polygon: public obj{
+class Polygon: public Shape{
 private:
     int size;
     Vertex *head, *tail;
